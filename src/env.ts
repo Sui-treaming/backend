@@ -12,6 +12,8 @@ const envSchema = z.object({
   MONGODB_URI: z.string().min(1, 'MONGODB_URI is required'),
   MONGODB_DB_NAME: z.string().min(1).default('upsuider_core'),
   MONGODB_SALT_DB_NAME: z.string().min(1).optional(),
+  TWITCH_EVENTSUB_SECRET: z.string().min(1, 'TWITCH_EVENTSUB_SECRET is required'),
+  TWITCH_CLIENT_ID: z.string().min(1).optional(),
 });
 
 const rawEnv = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
