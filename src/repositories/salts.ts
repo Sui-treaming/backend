@@ -26,7 +26,7 @@ export async function upsertSalt({ twitchId, salt }: SaltUpsertInput): Promise<V
     },
   );
 
-  if (!result.value) {
+  if (!result || !result.value) {
     throw new Error('Failed to upsert salt');
   }
 

@@ -1,3 +1,4 @@
+/// <reference path="./types/node/index.d.ts" />
 import Fastify, { FastifyServerOptions } from 'fastify';
 import cors from '@fastify/cors';
 import { env } from './env.js';
@@ -40,12 +41,15 @@ async function bootstrap() {
       port: env.PORT,
       host: '0.0.0.0',
     });
+    console.info(`[server] Fastify listening on http://127.0.0.1:${env.PORT}`);
   } catch (error) {
     app.log.error(error);
-    process.exit(1);
+    (globalThis as { process?: { exit(code?: number): never } }).process?.exit(1);
   }
 }
 
-if (process.env.NODE_ENV !== 'test') {
+const nodeEnv = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.NODE_ENV;
+
+if (nodeEnv !== 'test') {
   bootstrap();
 }

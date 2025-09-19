@@ -4,6 +4,9 @@ import { getViewerCollection, type ViewerDocument } from '../db/mongo.js';
 export type ViewerUpsertInput = {
   twitchId: string;
   walletAddress: string;
+  provider?: string;
+  audience?: string;
+  registeredAt?: Date;
   displayName?: string;
 };
 
@@ -25,6 +28,9 @@ export async function upsertViewer(input: ViewerUpsertInput): Promise<ViewerDocu
   } = {
     walletAddress: input.walletAddress,
     displayName: input.displayName,
+    provider: input.provider,
+    audience: input.audience,
+    registeredAt: input.registeredAt,
     updatedAt: now,
   };
 
@@ -46,8 +52,12 @@ export async function upsertViewer(input: ViewerUpsertInput): Promise<ViewerDocu
       options,
     );
 
-    if (!result.value) {
-      throw new Error('Failed to upsert viewer record');
+    if (!result || !result.value) {
+      const fallback = await collection.findOne(filter);
+      if (!fallback) {
+        throw new Error('Failed to upsert viewer record');
+      }
+      return fallback;
     }
 
     return result.value;
