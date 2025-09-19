@@ -5,6 +5,7 @@ import { connectMongo, closeMongo } from './db/mongo.js';
 import { transactionRoutes } from './routes/transactions.js';
 import { viewerRoutes } from './routes/viewers.js';
 import { saltRoutes } from './routes/salts.js';
+import { walrusRoutes } from './routes/walrus.js';
 import { eventSubRoutes } from './routes/eventsub.js';
 
 export async function buildServer(options: FastifyServerOptions = {}) {
@@ -24,9 +25,10 @@ export async function buildServer(options: FastifyServerOptions = {}) {
     app.get('/', async () => ({ status: '돈 벌자' }));
 
 
-    await app.register(transactionRoutes, { prefix: '/api' });
-    await app.register(viewerRoutes, { prefix: '/api' });
-    await app.register(saltRoutes, { prefix: '/api' });
+  await app.register(transactionRoutes, { prefix: '/api' });
+  await app.register(viewerRoutes, { prefix: '/api' });
+  await app.register(saltRoutes, { prefix: '/api' });
+  await app.register(walrusRoutes, { prefix: '/api' });
     await app.register(eventSubRoutes, { prefix: '/eventsub' });
 
     app.addHook('onClose', async () => {

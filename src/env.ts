@@ -12,8 +12,11 @@ const envSchema = z.object({
   MONGODB_URI: z.string().min(1, 'MONGODB_URI is required'),
   MONGODB_DB_NAME: z.string().min(1).default('upsuider_core'),
   MONGODB_SALT_DB_NAME: z.string().min(1).optional(),
-  TWITCH_EVENTSUB_SECRET: z.string().min(1, 'TWITCH_EVENTSUB_SECRET is required'),
+  TWITCH_EVENTSUB_SECRET: z.string().default(''),
   TWITCH_CLIENT_ID: z.string().min(1).optional(),
+  WALRUS_PUBLISHER_URL: z.string().url().default('https://publisher.walrus-testnet.walrus.space'),
+  WALRUS_AGGREGATOR_URL: z.string().url().default('https://aggregator.walrus-testnet.walrus.space'),
+  WALRUS_MAX_UPLOAD_BYTES: z.coerce.number().default(20 * 1024 * 1024),
 });
 
 const rawEnv = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
