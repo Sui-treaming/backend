@@ -14,4 +14,6 @@ const envSchema = z.object({
   MONGODB_SALT_DB_NAME: z.string().min(1).optional(),
 });
 
-export const env = envSchema.parse(process.env);
+const rawEnv = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
+
+export const env = envSchema.parse(rawEnv);

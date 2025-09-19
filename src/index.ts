@@ -1,4 +1,3 @@
-/// <reference path="./types/node/index.d.ts" />
 import Fastify, { FastifyServerOptions } from 'fastify';
 import cors from '@fastify/cors';
 import { env } from './env.js';

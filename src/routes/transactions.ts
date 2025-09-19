@@ -30,7 +30,7 @@ export const transactionRoutes: FastifyPluginAsync = async (fastify) => {
     tx.transferObjects([splitCoin], tx.pure.address(recipient));
 
     const signer = getServerKeypair();
-    const executionResult = await suiClient.signAndExecuteTransactionBlock({
+    const executionResult = await suiClient.signAndExecuteTransaction({
       signer,
       transaction: tx,
       options: { showEffects: true, showEvents: true },
