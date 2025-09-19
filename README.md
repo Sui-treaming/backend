@@ -26,7 +26,7 @@ npm run dev
 
 ```bash
 cd frontend
-npm install
+pnpm install
 npm run build
 # dist/ 폴더를 Chrome 확장 프로그램에서 로드
 ```

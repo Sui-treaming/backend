@@ -1,5 +1,27 @@
 {
-  "dependencies": {
-    "@mysten/sui": "^1.38.0"
-  }
+    "name": "upsuider-backend",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+        "build": "tsc -p tsconfig.json",
+        "start": "node dist/index.js"
+    },
+    "dependencies": {
+        "@fastify/cors": "^8.5.0",
+        "@mysten/sui": "^1.38.0",
+        "cross-fetch": "^4.0.0",
+        "dotenv": "^16.4.5",
+        "fastify": "^4.28.1",
+        "mongodb": "^6.5.0",
+        "sui": "^1.0.0",
+        "zod": "^3.22.4"
+    },
+    "devDependencies": {
+        "@types/node": "^20.11.30",
+        "ts-node-dev": "^2.0.0",
+        "tsx": "^4.7.1",
+        "typescript": "^5.4.5"
+    }
 }
