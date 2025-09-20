@@ -29,6 +29,7 @@ export async function connectMongo() {
         const viewers = getViewerCollection();
         const salts = getSaltCollection();
         const wallets = getWalletCollection();
+        const streamerAssets = getStreamerAssetCollection();
 
         await Promise.all([
             viewers.createIndex({ twitchId: 1 }, { unique: true, name: 'uniq_twitch_id' }),
@@ -36,6 +37,9 @@ export async function connectMongo() {
             salts.createIndex({ twitchId: 1 }, { unique: true, name: 'uniq_salt_twitch_id' }),
             wallets.createIndex({ walletAddress: 1 }, { unique: true, name: 'uniq_wallet_walletAddress' }),
             wallets.createIndex({ twitchUserId: 1 }, { unique: false, name: 'idx_wallet_twitchUserId' }),
+            streamerAssets.createIndex({ streamerId: 1 }, { unique: false, name: 'idx_streamer_assets_streamerId' }),
+            streamerAssets.createIndex({ filePath: 1 }, { unique: true, name: 'uniq_streamer_assets_filePath' }),
+            streamerAssets.createIndex({ storagePath: 1 }, { unique: true, name: 'uniq_streamer_assets_storagePath' }),
         ]);
 
         indexesEnsured = true;
@@ -67,6 +71,10 @@ export function getSaltCollection<T extends Document = ViewerSaltDocument>(): Co
 
 export function getWalletCollection<T extends Document = ZkLoginWalletDocument>(): Collection<T> {
     return getViewerDb().collection<T>('zklogin_wallet');
+}
+
+export function getStreamerAssetCollection<T extends Document = StreamerAssetDocument>(): Collection<T> {
+    return getViewerDb().collection<T>('streamerAssets');
 }
 
 export async function closeMongo() {
@@ -103,6 +111,17 @@ export interface ZkLoginWalletDocument extends Document {
     twitchUserId: string;
     audience?: string;
     registeredAt: Date;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+export interface StreamerAssetDocument extends Document {
+    streamerId: string;
+    filePath: string;
+    storagePath: string;
+    originalFilename?: string;
+    contentType?: string;
+    fileSize?: number;
     createdAt: Date;
     updatedAt: Date;
 }

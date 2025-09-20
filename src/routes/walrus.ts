@@ -1,86 +1,33 @@
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import { env } from '../env.js';
-import { request as httpRequestNode } from 'node:http';
-import { request as httpsRequestNode } from 'node:https';
-import { URL } from 'node:url';
+import { writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { join } from 'node:path';
+import { ensureUploadDir, buildPublicPath, buildPublicUrl } from '../storage/localUploads.js';
+import { createStreamerAsset } from '../repositories/streamerAssets.js';
 
-const DEFAULT_POLL_ATTEMPTS = 20;
-const DEFAULT_POLL_DELAY_MS = 2000;
-
-function extractIdentifiers(response: any) {
-  const blobIdFromNew = response?.newlyCreated?.blobObject?.blobId;
-  const blobIdFromAlready = response?.alreadyCertified?.blobId;
-  const objectIdFromNew = response?.newlyCreated?.blobObject?.id;
-  const objectIdFromAlready = response?.alreadyCertified?.blobObjectId || response?.alreadyCertified?.objectId;
-  return {
-    blobId: blobIdFromNew || blobIdFromAlready || undefined,
-    objectId: objectIdFromNew || objectIdFromAlready || undefined,
-  } as { blobId?: string; objectId?: string };
+async function savePngToLocalUploads(bytes: Buffer) {
+  const uploadDir = await ensureUploadDir();
+  const filename = `${Date.now()}-${randomUUID()}.png`;
+  const storagePath = join(uploadDir, filename);
+  await writeFile(storagePath, bytes);
+  const filePath = buildPublicPath(filename);
+  return { filename, storagePath, filePath } as { filename: string; storagePath: string; filePath: string };
 }
 
-function httpRequest(method: string, targetUrl: string | URL, body?: Buffer, headers: Record<string, string> = {}) {
-  const url = typeof targetUrl === 'string' ? new URL(targetUrl) : targetUrl;
-  const isHttps = url.protocol === 'https:';
-  const transport = isHttps ? httpsRequestNode : httpRequestNode;
-  const options = {
-    method,
-    hostname: url.hostname,
-    port: url.port ? Number(url.port) : (isHttps ? 443 : 80),
-    path: `${url.pathname}${url.search}`,
-    headers,
-  };
-  return new Promise<{ status: number; headers: Record<string, string | string[] | undefined>; body: Buffer }>((resolve, reject) => {
-    const req = transport(options, (res) => {
-      const chunks: Buffer[] = [];
-      res.on('data', (c: Buffer) => chunks.push(c));
-      res.on('end', () => {
-        resolve({ status: res.statusCode || 0, headers: res.headers as any, body: Buffer.concat(chunks) });
-      });
-    });
-    req.on('error', reject);
-    if (body && body.length > 0) req.write(body);
-    req.end();
-  });
+function firstHeaderValue(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
 }
 
-async function storeBufferPng(bytes: Buffer) {
-  const url = new URL('/v1/blobs', env.WALRUS_PUBLISHER_URL);
-  const res = await httpRequest('PUT', url, bytes, {
-    'content-type': 'image/png',
-    'content-length': String(bytes.length),
-  });
-  if (res.status < 200 || res.status >= 300) {
-    const text = res.body.toString('utf-8');
-    throw new Error(`Walrus publisher error HTTP ${res.status}: ${text}`);
+function resolveRequestOrigin(request: FastifyRequest): string | undefined {
+  const forwardedProto = firstHeaderValue(request.headers['x-forwarded-proto']);
+  const forwardedHost = firstHeaderValue(request.headers['x-forwarded-host']);
+  const host = forwardedHost ?? firstHeaderValue(request.headers['host']);
+  if (!host) {
+    return undefined;
   }
-  const json = JSON.parse(res.body.toString('utf-8')) as any;
-  const { blobId, objectId } = extractIdentifiers(json);
-  return { responseJson: json, blobId, objectId } as { responseJson: any; blobId?: string; objectId?: string };
-}
-
-async function fetchBlobById(blobId: string) {
-  const url = new URL(`/v1/blobs/${encodeURIComponent(blobId)}`, env.WALRUS_AGGREGATOR_URL);
-  return httpRequest('GET', url);
-}
-
-async function fetchBlobByObjectId(objectId: string) {
-  const url = new URL(`/v1/blobs/by-object-id/${encodeURIComponent(objectId)}`, env.WALRUS_AGGREGATOR_URL);
-  return httpRequest('GET', url);
-}
-
-async function pollForBlob(blobId?: string, objectId?: string, attempts = DEFAULT_POLL_ATTEMPTS, delayMs = DEFAULT_POLL_DELAY_MS) {
-  for (let i = 1; i <= attempts; i++) {
-    if (blobId) {
-      const res = await fetchBlobById(blobId);
-      if (res.status === 200) return;
-    }
-    if (objectId) {
-      const res = await fetchBlobByObjectId(objectId);
-      if (res.status === 200) return;
-    }
-    if (i < attempts) await new Promise(r => setTimeout(r, delayMs));
-  }
-  throw new Error(`Timed out waiting for blob availability after ${attempts} attempts.`);
+  const protocol = forwardedProto ?? request.protocol ?? 'http';
+  return `${protocol}://${host}`;
 }
 
 // Minimal multipart/form-data parsing (derived from test_walrus)
@@ -208,12 +155,24 @@ export const walrusRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   fastify.post('/walrus/upload', async (request, reply) => {
-    const contentType = String(request.headers['content-type'] || '').toLowerCase();
+    const rawContentTypeHeader = request.headers['content-type'];
+    const contentType = Array.isArray(rawContentTypeHeader)
+      ? rawContentTypeHeader[0] ?? ''
+      : (rawContentTypeHeader ?? '');
+    const normalizedContentType = contentType.toLowerCase();
     const rawBody = request.body as Buffer | undefined;
+    const streamerIdHeader = request.headers['streamid'];
+    const streamerIdValue = Array.isArray(streamerIdHeader) ? streamerIdHeader[0] : streamerIdHeader;
+    const streamerId = streamerIdValue ? String(streamerIdValue).trim() : '';
 
     if (!rawBody || rawBody.length === 0) {
       reply.status(400);
       return { error: 'empty_body' };
+    }
+
+    if (!streamerId) {
+      reply.status(400);
+      return { error: 'missing_stream_id', message: 'Include streamid header to associate the upload.' };
     }
 
     if (rawBody.length > env.WALRUS_MAX_UPLOAD_BYTES) {
@@ -222,9 +181,12 @@ export const walrusRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     let pngBytes: Buffer | null = null;
-    if (contentType.includes('image/png') || contentType === 'application/octet-stream') {
+    let uploadContentType: string | undefined;
+    let originalFilename: string | undefined;
+    if (normalizedContentType.includes('image/png') || normalizedContentType === 'application/octet-stream') {
       pngBytes = rawBody;
-    } else if (contentType.includes('multipart/form-data')) {
+      uploadContentType = contentType || 'image/png';
+    } else if (normalizedContentType.includes('multipart/form-data')) {
       const match = /boundary=([^;]+)(;|$)/i.exec(contentType);
       if (!match) {
         reply.status(400);
@@ -238,6 +200,8 @@ export const walrusRoutes: FastifyPluginAsync = async (fastify) => {
           || parts[0];
         if (filePart && filePart.data && filePart.data.length > 0) {
           pngBytes = filePart.data;
+          uploadContentType = filePart.headers['content-type'] || uploadContentType;
+          originalFilename = filePart.disposition?.filename ?? originalFilename;
         }
       } catch (_e) {
         try {
@@ -247,6 +211,8 @@ export const walrusRoutes: FastifyPluginAsync = async (fastify) => {
             || parts2[0];
           if (fp2 && fp2.data && fp2.data.length > 0) {
             pngBytes = fp2.data;
+            uploadContentType = fp2.headers['content-type'] || uploadContentType;
+            originalFilename = fp2.disposition?.filename ?? originalFilename;
           }
         } catch {
           // fallthrough
@@ -259,20 +225,36 @@ export const walrusRoutes: FastifyPluginAsync = async (fastify) => {
       return { error: 'unsupported_media', message: 'Send image/png or multipart/form-data with a PNG file' };
     }
 
+    uploadContentType = uploadContentType ?? 'image/png';
+
     try {
-      const { blobId, objectId } = await storeBufferPng(pngBytes);
-      // Optional polling: true by default; disable with ?poll=false
-      const pollParam = String((request.query as any)?.poll ?? 'true').toLowerCase();
-      const doPoll = pollParam !== 'false' && pollParam !== '0';
-      if (doPoll) {
-        try { await pollForBlob(blobId, objectId); } catch (e) { request.log.warn({ err: e }, 'Aggregator poll timed out'); }
-      }
+      const savedFile = await savePngToLocalUploads(pngBytes);
+      const asset = await createStreamerAsset({
+        streamerId,
+        filePath: savedFile.filePath,
+        storagePath: savedFile.storagePath,
+        originalFilename,
+        contentType: uploadContentType,
+        fileSize: pngBytes.length,
+      });
+      const origin = resolveRequestOrigin(request);
+      const publicUrl = buildPublicUrl(savedFile.filePath, origin);
       reply.header('Cache-Control', 'no-store');
-      return { ok: true, blobId, objectId, publisherUrl: env.WALRUS_PUBLISHER_URL, aggregatorUrl: env.WALRUS_AGGREGATOR_URL };
+      return {
+        ok: true,
+        assetId: asset._id?.toString?.(),
+        streamerId,
+        filename: savedFile.filename,
+        filePath: asset.filePath,
+        publicUrl,
+        originalFilename,
+        contentType: uploadContentType,
+        fileSize: pngBytes.length,
+      };
     } catch (err) {
-      request.log.error({ err }, 'Walrus upload failed');
-      reply.status(502);
-      return { ok: false, error: 'walrus_upload_failed' };
+      request.log.error({ err, streamerId }, 'Streamer asset persistence failed');
+      reply.status(500);
+      return { ok: false, error: 'asset_persistence_failed' };
     }
   });
 };

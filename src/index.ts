@@ -1,5 +1,6 @@
 import Fastify, { FastifyServerOptions } from 'fastify';
 import cors from '@fastify/cors';
+import fastifyStatic from '@fastify/static';
 import { env } from './env.js';
 import { connectMongo, closeMongo } from './db/mongo.js';
 import { transactionRoutes } from './routes/transactions.js';
@@ -7,10 +8,12 @@ import { viewerRoutes } from './routes/viewers.js';
 import { saltRoutes } from './routes/salts.js';
 import { walrusRoutes } from './routes/walrus.js';
 import { eventSubRoutes } from './routes/eventsub.js';
+import { ensureUploadDir, uploadStaticPrefix } from './storage/localUploads.js';
 
 export async function buildServer(options: FastifyServerOptions = {}) {
     const app = Fastify({
         logger: true,
+        bodyLimit: 50 * 1024 * 1024,
         ...options,
     });
 
@@ -21,14 +24,26 @@ export async function buildServer(options: FastifyServerOptions = {}) {
         credentials: true,
     });
 
+    const uploadDir = await ensureUploadDir();
+    await app.register(fastifyStatic, {
+        root: uploadDir,
+        prefix: `${uploadStaticPrefix}/`,
+        decorateReply: false,
+        list: false,
+        index: false,
+        setHeaders(res) {
+            res.setHeader('Cache-Control', 'public, max-age=86400');
+        },
+    });
+
     app.get('/health', async () => ({ status: 'ok' }));
     app.get('/', async () => ({ status: '돈 벌자' }));
 
 
-  await app.register(transactionRoutes, { prefix: '/api' });
-  await app.register(viewerRoutes, { prefix: '/api' });
-  await app.register(saltRoutes, { prefix: '/api' });
-  await app.register(walrusRoutes, { prefix: '/api' });
+    await app.register(transactionRoutes, { prefix: '/api' });
+    await app.register(viewerRoutes, { prefix: '/api' });
+    await app.register(saltRoutes, { prefix: '/api' });
+    await app.register(walrusRoutes, { prefix: '/api' });
     await app.register(eventSubRoutes, { prefix: '/eventsub' });
 
     app.addHook('onClose', async () => {
