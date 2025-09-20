@@ -88,8 +88,12 @@ Static files saved via Walrus upload are exposed from `/uploads/*`.
 ## Move Package (`contracts/`)
 - Build locally with `sui move build` (and `sui move test`) before publishing.
 - When ready, update `Move.toml` addresses and run `sui client publish --gas-budget 100000000 --json` from the `contracts/` folder. Capture the returned `packageId` and sync it with `src/services/upsuiderNft.ts`.
-- Invoke the module from the CLI via `sui client call --package <PACKAGE_ID> --module upsuider_contract --function mint ...` to test minting or transfer flows.
-- Named address `@upsuider_contract` defaults to `0x0`; replace it with the publishing account for devnet/testnet/mainnet.
+- **NFT module**: invoke via `sui client call --package <PACKAGE_ID> --module upsuider_contract --function mint ...` (or `transfer_nft`), adjusting the metadata strings and recipient.
+- **Coin module**:
+  - Publish output will include a `TreasuryCap<MY_COIN>` object. Keep its object ID safe; only the holder can mint/burn supply.
+  - Mint coins with `sui client call --package <PACKAGE_ID> --module my_coin --function mint --args <TREASURY_CAP_ID> <AMOUNT_IN_MIST> <RECIPIENT_ADDRESS> --gas-budget 50000000`.
+  - Burn coins with `sui client call --package <PACKAGE_ID> --module my_coin --function burn --args <TREASURY_CAP_ID> <COIN_OBJECT_ID> --gas-budget 30000000`.
+- Named addresses like `@upsuider_contract` and `@my_coin_pkg` default to `0x0`; replace them with the publishing account for devnet/testnet/mainnet.
 - A detailed guide (including publish/call examples) lives in `contracts/README.md`.
 
 ## Deployment Notes
