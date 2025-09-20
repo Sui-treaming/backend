@@ -50,3 +50,4 @@ module upsuider_contract::upsuider_contract {
         (&nft.name, &nft.description, &nft.image_url)
     }
 }
+

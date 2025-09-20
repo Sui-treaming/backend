@@ -19,6 +19,7 @@ edition = "2024.beta" # edition = "legacy" to use legacy (pre-2024) Move
 
 [addresses]
 upsuider_contract = "0x0"
+my_coin_pkg = "0x0"
 
 # Named addresses will be accessible in Move as `@name`. They're also exported:
 # for example, `std = "0x1"` is exported by the Standard Library.
@@ -34,3 +35,5 @@ upsuider_contract = "0x0"
 # and `--dev` modes.
 # alice = "0xB0B"
 
+upsuider_contract = "0x0"
+my_coin_pkg = "0x0"
