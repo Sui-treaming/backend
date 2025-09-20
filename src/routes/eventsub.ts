@@ -7,6 +7,7 @@ import {
   registerMessage,
   verifyEventSubSignature,
 } from '../services/eventsubVerifier.js';
+import { mintUpsuiderNft } from '../services/upsuiderNft.js';
 
 const challengeSchema = z.object({
   challenge: z.string(),
@@ -105,14 +106,26 @@ export const eventSubRoutes: FastifyPluginAsync = async (fastify) => {
         };
       }
 
+      const metadata = {
+        name: env.UPSUIDER_NFT_NAME ?? `Upsuider NFT for ${twitchUserId}`,
+        description:
+          env.UPSUIDER_NFT_DESCRIPTION ??
+          `Minted for Twitch user ${twitchUserId} via Upsuider integration`,
+        imageUrl: env.UPSUIDER_NFT_IMAGE_URL ?? '',
+      };
+
+      const mintResult = await mintUpsuiderNft(wallet.walletAddress, metadata);
+
       return {
         twitchUserId,
         walletAddress: wallet.walletAddress,
+        transactionDigest: mintResult.digest,
+        metadata,
       };
     } catch (error) {
-      request.log.error({ err: error }, 'Failed to resolve wallet for EventSub notification');
+      request.log.error({ err: error }, 'Failed to process EventSub notification');
       reply.status(500);
-      return { error: 'internal_error', message: 'Failed to resolve wallet address' };
+      return { error: 'internal_error', message: 'Failed to process reward redemption' };
     }
   });
 };

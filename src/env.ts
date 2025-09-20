@@ -17,6 +17,9 @@ const envSchema = z.object({
   WALRUS_PUBLISHER_URL: z.string().url().default('https://publisher.walrus-testnet.walrus.space'),
   WALRUS_AGGREGATOR_URL: z.string().url().default('https://aggregator.walrus-testnet.walrus.space'),
   WALRUS_MAX_UPLOAD_BYTES: z.coerce.number().default(20 * 1024 * 1024),
+  UPSUIDER_NFT_NAME: z.string().optional(),
+  UPSUIDER_NFT_DESCRIPTION: z.string().optional(),
+  UPSUIDER_NFT_IMAGE_URL: z.string().url().optional(),
 });
 
 const rawEnv = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
