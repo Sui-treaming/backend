@@ -6,9 +6,9 @@ module my_coin_pkg::my_coin {
 
     fun init(witness: MY_COIN, ctx: &mut sui::tx_context::TxContext) {
         let decimals: u8 = 9;
-        let symbol = b"WSV";
-        let name = b"My Coin";
-        let description = b"";
+        let symbol = b"UP";
+        let name = b"Upsuider Coin";
+        let description = b"Upsider Coin for the Upsider platform";
         let icon = option::some(url::new_unsafe_from_bytes(b"https://example.com/icon.png"));
         let (treasury, metadata) = coin::create_currency<MY_COIN>(
             witness, decimals, symbol, name, description, icon, ctx
