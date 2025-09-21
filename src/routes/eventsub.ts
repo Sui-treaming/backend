@@ -10,6 +10,7 @@ import {
     verifyEventSubSignature,
 } from '../services/eventsubVerifier.js';
 import { mintUpsuiderNft } from '../services/upsuiderNft.js';
+import { mintUpsuiderCoin } from '../services/upsuiderCoin.js';
 
 const challengeSchema = z.object({
     challenge: z.string(),
@@ -22,6 +23,9 @@ const notificationSchema = z.object({
     event: z.object({
         user_id: z.string(),
         broadcaster_user_id: z.string(),
+        reward: z.object({
+            id: z.string(),
+          }),
     }),
 });
 
@@ -112,6 +116,7 @@ export const eventSubRoutes: FastifyPluginAsync = async (fastify) => {
         }
         const streamerId = parsed.data.event.broadcaster_user_id
         const twitchUserId = parsed.data.event.user_id;
+        const rewardId = parsed.data.event.reward.id;
 
         try {
             const wallet = await findWalletByTwitchUserId(twitchUserId);
@@ -124,35 +129,53 @@ export const eventSubRoutes: FastifyPluginAsync = async (fastify) => {
                     twitchUserId,
                 };
             }
+            
+            if (rewardId === 'reward-test-001') {
+                const latestAsset = await findLatestStreamerAsset(streamerId);
+                if (!latestAsset) {
+                    reply.status(404);
+                    return {
+                        error: 'Sender Address Not Found',
+                        message: 'Sender Must Make NFT',
+                        streamerId,
+                    };
+                }
+                const origin = resolveRequestOrigin(request);
+                const assetUrl = latestAsset?.filePath ? buildPublicUrl(latestAsset.filePath, origin) : undefined;
 
-            const latestAsset = await findLatestStreamerAsset(streamerId);
-            if (!latestAsset) {
-                reply.status(404);
+                const metadata = {
+                    name: env.UPSUIDER_NFT_NAME ?? `Upsuider NFT for ${twitchUserId}`,
+                    description:
+                        env.UPSUIDER_NFT_DESCRIPTION ??
+                        `Minted for Twitch user ${twitchUserId} via Upsuider integration`,
+                    imageUrl: assetUrl ?? env.UPSUIDER_NFT_IMAGE_URL ?? '',
+                };
+
+                const mintResult = await mintUpsuiderNft(wallet.walletAddress, metadata);
+
                 return {
-                    error: 'Sender Address Not Found',
-                    message: 'Sender Must Make NFT',
-                    streamerId,
+                    twitchUserId,
+                    walletAddress: wallet.walletAddress,
+                    transactionDigest: mintResult.digest,
+                    metadata,
                 };
             }
-            const origin = resolveRequestOrigin(request);
-            const assetUrl = latestAsset?.filePath ? buildPublicUrl(latestAsset.filePath, origin) : undefined;
-
-            const metadata = {
-                name: env.UPSUIDER_NFT_NAME ?? `Upsuider NFT for ${twitchUserId}`,
-                description:
-                    env.UPSUIDER_NFT_DESCRIPTION ??
-                    `Minted for Twitch user ${twitchUserId} via Upsuider integration`,
-                imageUrl: assetUrl ?? env.UPSUIDER_NFT_IMAGE_URL ?? '',
-            };
-
-            const mintResult = await mintUpsuiderNft(wallet.walletAddress, metadata);
-
-            return {
-                twitchUserId,
-                walletAddress: wallet.walletAddress,
-                transactionDigest: mintResult.digest,
-                metadata,
-            };
+            if (rewardId === 'reward-test-002') {
+                const { response: mintResult, amount } = await mintUpsuiderCoin(wallet.walletAddress);
+        
+                return {
+                  rewardId,
+                  twitchUserId,
+                  walletAddress: wallet.walletAddress,
+                  transactionDigest: mintResult.digest,
+                  amount: amount.toString(),
+                  effects: mintResult.effects ?? null,
+                };
+              }
+        
+              request.log.info({ rewardId }, 'Unhandled reward id received');
+              reply.status(204);
+              return null;
         } catch (error) {
             request.log.error({ err: error }, 'Failed to process EventSub notification');
             reply.status(500);

@@ -22,6 +22,11 @@ const envSchema = z.object({
     UPSUIDER_NFT_NAME: z.string().optional(),
     UPSUIDER_NFT_DESCRIPTION: z.string().optional(),
     UPSUIDER_NFT_IMAGE_URL: z.string().url().optional(),
+    UPSUIDER_COIN_PACKAGE_ID: z.string().optional(),
+    UPSUIDER_COIN_MODULE: z.string().optional(),
+    UPSUIDER_COIN_MINT_FUNCTION: z.string().optional(),
+    UPSUIDER_COIN_TREASURY_CAP_ID: z.string().optional(),
+    UPSUIDER_COIN_AIRDROP_AMOUNT: z.coerce.number().optional(),
 });
 
 const rawEnv = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
