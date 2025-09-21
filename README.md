@@ -97,8 +97,8 @@ Static files saved via Walrus upload are exposed from `/uploads/*`.
 - A detailed guide (including publish/call examples) lives in `contracts/README.md`.
 
 ## Deployment Notes
-- `npm run pm2` boots the compiled server using the supplied `ecosystem.config.js`.
-- `deploy/nginx/upsuider-backend.conf` and `deploy/iptables_port80_to_4000.sh`
+- setting some .env(key pair, db url, api url..).
+- `npm install, npm run build, pm2 start dist/index.js`
   contain sample reverse-proxy/port-forward recipes (see `deploy/README.md`).
 - The Fastify instance binds to `0.0.0.0` so it can be fronted by Nginx on port 80.
 
